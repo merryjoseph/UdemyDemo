@@ -10,7 +10,6 @@ public class UserEntity implements Serializable {
     private static final long serialVersionUID = -4326105067790116996L;
 
     @Id
-    @Column()
    @GeneratedValue(strategy = GenerationType.IDENTITY)
     private long id;
 
@@ -34,7 +33,11 @@ public class UserEntity implements Serializable {
     @Column(nullable = false)
     private Boolean emailVerificationStatus=false;
 
-    @OneToMany(mappedBy = "userEntity",cascade = CascadeType.ALL)
+    @OneToMany(targetEntity = AddressEntity.class,cascade = CascadeType.ALL)
+    @JoinColumn(
+            name = "user_id",
+            referencedColumnName = "id"
+    )
     private List<AddressEntity> addressEntities;
 
     public List<AddressEntity> getAddressEntities() {

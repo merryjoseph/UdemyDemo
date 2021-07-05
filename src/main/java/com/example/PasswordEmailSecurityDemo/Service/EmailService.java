@@ -1,5 +1,6 @@
 package com.example.PasswordEmailSecurityDemo.Service;
 
+import com.example.PasswordEmailSecurityDemo.Entity.PasswordResetTokenEntity;
 import com.example.PasswordEmailSecurityDemo.Entity.UserEntity;
 import com.example.PasswordEmailSecurityDemo.Security.AppProperties;
 import com.example.PasswordEmailSecurityDemo.SpringApplicationContext;
@@ -19,7 +20,8 @@ public class EmailService {
 
     @Autowired
     private JavaMailSender mailSender;
-    public void sendSimpleEmail(UserEntity userEntity,String url) throws MessagingException, UnsupportedEncodingException {
+
+    public void sendSimpleEmailForAccountActivation(UserEntity userEntity, String url) throws MessagingException, UnsupportedEncodingException {
         String toAddress = userEntity.getEmail();
         String fromAddress = "merryjoseph00@gmail.com";
         String senderName = "W3 Schools";
@@ -51,4 +53,38 @@ public class EmailService {
     }
 
 
+
+    public void sendSimpleEmailForPasswordReset(
+            PasswordResetTokenEntity passwordResetTokenEntity, UserEntity userEntity,String url)
+            throws MessagingException, UnsupportedEncodingException {
+
+        String toAddress = passwordResetTokenEntity.getUserDetails().getEmail();
+        String fromAddress = "merryjoseph00@gmail.com";
+        String senderName = "W3 Schools";
+        String subject = "Please reset your password here";
+        String content = "Dear [[name]],<br>"
+                + "Please click the link below to reset your password:<br>"
+                + "<h3><a href=\"[[URL]]\" target=\"_self\">RESET</a></h3>"
+                + "Thank you,<br>"
+                + "Your company name.";
+
+
+        MimeMessage message = mailSender.createMimeMessage();
+        MimeMessageHelper helper = new MimeMessageHelper(message);
+
+        helper.setFrom(fromAddress, senderName);
+        helper.setTo(toAddress);
+        helper.setSubject(subject);
+
+        content = content.replace("[[name]]", passwordResetTokenEntity.getUserDetails().getFirstName());
+        String resetURL = url + "/users/"+userEntity.getUserId()+"/resetpassword?token=" + passwordResetTokenEntity.getToken();
+
+        content = content.replace("[[URL]]", resetURL);
+
+        helper.setText(content, true);
+
+        mailSender.send(message);
+
+        System.out.println("Password Reset Mail Sent.............");
+    }
 }

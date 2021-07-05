@@ -32,9 +32,9 @@ public class AddressEntity implements Serializable {
     @Column(length = 10, nullable = false)
     private String type;
 
-    @ManyToOne
-    @JoinColumn(name = "users_id")
-    private UserEntity userEntity;
+//    @ManyToOne
+//    @JoinColumn(name = "users_id")
+//    private UserEntity userEntity;
 
     public long getId() {
         return id;
@@ -92,11 +92,5 @@ public class AddressEntity implements Serializable {
         this.type = type;
     }
 
-    public UserEntity getUserEntity() {
-        return userEntity;
-    }
 
-    public void setUserEntity(UserEntity userEntity) {
-        this.userEntity = userEntity;
-    }
 }

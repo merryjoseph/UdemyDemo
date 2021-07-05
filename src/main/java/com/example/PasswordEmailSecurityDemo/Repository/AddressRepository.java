@@ -9,7 +9,7 @@ import org.springframework.stereotype.Repository;
 public interface AddressRepository  extends JpaRepository<AddressEntity,Long> {
 
 
-    Iterable<AddressEntity> findAllByUserEntity(UserEntity userEntity);
+   // Iterable<AddressEntity> findAllByUserEntity(UserEntity userEntity);
 
     AddressEntity findByAddressId(String addressid);
 }

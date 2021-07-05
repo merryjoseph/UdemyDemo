@@ -61,7 +61,12 @@ public class AuthenticationFilter extends UsernamePasswordAuthenticationFilter {
                 .signWith(SignatureAlgorithm.HS512,SecurityConstants.getTokenSecret())
                 .compact();
         UserService userService = (UserService) SpringApplicationContext.getBean("userService");
-        UserDto userDto=userService.getUser(userName);
+        UserDto userDto= null;
+        try {
+            userDto = userService.getUser(userName);
+        } catch (Exception e) {
+            e.printStackTrace();
+        }
         res.addHeader(SecurityConstants.HEADER_STRING,SecurityConstants.TOKEN_PREFIX+token);
         res.addHeader("UserID",userDto.getUserId());
 

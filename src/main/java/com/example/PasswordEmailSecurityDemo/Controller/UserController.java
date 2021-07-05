@@ -60,6 +60,7 @@ public class UserController {
         if (userSignUpRequestModel.getEmail().isEmpty())
             throw new NullPointerException("The object is null ");
 
+
         ModelMapper modelMapper = new ModelMapper();
         UserDto userDto = modelMapper.map(userSignUpRequestModel, UserDto.class);
 
@@ -71,6 +72,7 @@ public class UserController {
         }
 
         userDto.setAddressDtos(addressDtos);
+
         UserDto createdUser = userService.createUser(userDto,getSiteURL(request));
 
         List<AddressResponseModel> addressResponseModels = new ArrayList<AddressResponseModel>();
@@ -187,15 +189,19 @@ public class UserController {
         //return returnValue;
     }
 
-    @PostMapping(path="/password-reset-request",
-                consumes = {MediaType.APPLICATION_JSON_VALUE, MediaType.APPLICATION_XML_VALUE},
-                produces = {MediaType.APPLICATION_JSON_VALUE, MediaType.APPLICATION_XML_VALUE})
-    public OperationModel operationModel(
-            @RequestBody PasswordResetRequestModel passwordResetRequestModel) throws Exception {
+    @GetMapping(path="/{userid}/password-reset-request",
+            produces = {MediaType.APPLICATION_JSON_VALUE, MediaType.APPLICATION_XML_VALUE})
+    public OperationModel passwordResetRequest(
+            @PathVariable String userid,
+           // @RequestBody PasswordResetRequestModel passwordResetRequestModel,
+            HttpServletRequest request) throws Exception {
 
         OperationModel returnValue = new OperationModel();
 
-        boolean operationResult = userService.requestPasswordReset(passwordResetRequestModel.getEmail());
+        UserDto userDto=userService.getUserByUserId(userid);
+
+        boolean operationResult = userService.requestPasswordReset(userDto,
+                getSiteURL(request));
 
         returnValue.setOperationName(RequestOperationName.REQUEST_PASSWORD_RESET.name());
         returnValue.setOperationStatus(RequestOperationStatus.ERROR.name());
@@ -208,11 +214,11 @@ public class UserController {
         return returnValue;
     }
 
-    //    http://localhost:8080/passwordemailsecuritydemo/users/email-verification?token=asdsdfsd
+    //    http://localhost:8080/passwordemailsecuritydemo/users/verify?code=asdsdfsd
     @GetMapping(path = "/verify",
             produces = {MediaType.APPLICATION_JSON_VALUE, MediaType.APPLICATION_XML_VALUE})
     public OperationModel verifyEmailToken(@RequestParam(value = "code") String token) {
-        System.out.println("Inside email verify");
+
         OperationModel returnValue = new OperationModel();
         returnValue.setOperationName(RequestOperationName.VERIFY_EMAIL.name());
 
@@ -229,8 +235,30 @@ public class UserController {
 
     private String getSiteURL(HttpServletRequest request) {
         String siteURL = request.getRequestURL().toString();
+
         return siteURL.replace(request.getServletPath(), "");
     }
 
+    @GetMapping(path = "/{userid}/resetpassword",
+            produces = {MediaType.APPLICATION_JSON_VALUE, MediaType.APPLICATION_XML_VALUE})
+    public OperationModel verifyPasswordResetToken(
+            @PathVariable String userid,
+            @RequestParam(value = "token") String token,
+           @RequestBody PasswordResetRequestModel passwordResetRequestModel
+    ) {
+
+        OperationModel returnValue = new OperationModel();
+        returnValue.setOperationName(RequestOperationName.REQUEST_PASSWORD_RESET.name());
+
+        boolean isVerified=userService.verifyPasswordResetToken(userid,token,passwordResetRequestModel);
+        if(isVerified){
+            returnValue.setOperationStatus(RequestOperationStatus.SUCCESS.name());
+        }
+        else{
+            returnValue.setOperationStatus(RequestOperationStatus.ERROR.name());
+        }
+
+        return returnValue;
+    }
 
 }

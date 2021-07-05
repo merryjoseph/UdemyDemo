@@ -29,11 +29,10 @@ public class AddressService {
         UserEntity userEntity = userRepository.findByUserId(id);
         if(userEntity == null) throw new UsernameNotFoundException("User Does not Exixt");
 
-        Iterable<AddressEntity> addressEntities = addressRepository.findAllByUserEntity(userEntity);
-        for(AddressEntity addressEntity:addressEntities){
+//        Iterable<AddressEntity> addressEntities = addressRepository.findAllByUserEntity(userEntity);
+        for(AddressEntity addressEntity:userEntity.getAddressEntities()){
             returnValue.add( new ModelMapper().map(addressEntity,AddressDto.class));
-        }
-
+       }
 
         return returnValue;
 

@@ -3,8 +3,11 @@ package com.example.PasswordEmailSecurityDemo.Service;
 import com.example.PasswordEmailSecurityDemo.DTO.AddressDto;
 import com.example.PasswordEmailSecurityDemo.DTO.UserDto;
 import com.example.PasswordEmailSecurityDemo.Entity.AddressEntity;
+import com.example.PasswordEmailSecurityDemo.Entity.PasswordResetTokenEntity;
 import com.example.PasswordEmailSecurityDemo.Entity.UserEntity;
+import com.example.PasswordEmailSecurityDemo.ModelRequest.PasswordResetRequestModel;
 import com.example.PasswordEmailSecurityDemo.Repository.AddressRepository;
+import com.example.PasswordEmailSecurityDemo.Repository.PasswordResetTokenRepository;
 import com.example.PasswordEmailSecurityDemo.Repository.UserRepository;
 import com.example.PasswordEmailSecurityDemo.Utilities.Utils;
 import org.modelmapper.ModelMapper;
@@ -24,7 +27,6 @@ import javax.mail.MessagingException;
 import java.io.UnsupportedEncodingException;
 import java.util.ArrayList;
 import java.util.List;
-import java.util.Optional;
 
 @Service
 public class UserService implements UserDetailsService {
@@ -34,17 +36,21 @@ public class UserService implements UserDetailsService {
     @Autowired
     EmailService emailService;
 
-    @Autowired
-    AddressRepository addressRepository;
+
 
     @Autowired
     UserRepository userRepository;
+
+    @Autowired
+    PasswordResetTokenRepository passwordResetTokenRepository;
 
     @Autowired
     Utils utils;
 
     @Autowired
     BCryptPasswordEncoder bCryptPasswordEncoder;
+
+
 
     public UserDto createUser(UserDto userDto, String url) throws MessagingException, UnsupportedEncodingException {
         if (userRepository.findByEmail(userDto.getEmail()) != null)
@@ -63,7 +69,7 @@ public class UserService implements UserDetailsService {
         userEntity.setEncryptedPassword(bCryptPasswordEncoder.encode(userDto.getPassword()));
         userEntity.setUserId(publicUserId);
         userEntity.setEmailVerificationToken(utils.generateEmailVerificationToken(publicUserId));
-        userEntity.setEmailVerificationStatus(true);
+        userEntity.setEmailVerificationStatus(false);
 
         List<AddressEntity> addressEntities = new ArrayList<AddressEntity>();
         for(int i=0;i<userDto.getAddressDtos().size();i++)
@@ -76,19 +82,19 @@ public class UserService implements UserDetailsService {
         UserEntity storedUserEntity = userRepository.save(userEntity);
 
         // sending email to user once registered
-        this.triggerMail(storedUserEntity,url);
+        this.triggerMailForAccountActivation(storedUserEntity,url);
 
         List<AddressDto> addressDtos = new ArrayList<AddressDto>();
         for(int i=0;i<storedUserEntity.getAddressEntities().size();i++)
         {
             AddressEntity addressEntity = storedUserEntity.getAddressEntities().get(i);
-            addressEntity.setUserEntity(storedUserEntity);
+
             AddressDto addressDto = modelMapper.map(addressEntity,AddressDto.class);
-            addressRepository.save(addressEntity);
+
             addressDtos.add(addressDto);
         }
         UserDto returnUser = modelMapper.map(storedUserEntity, UserDto.class);
-        returnUser.setAddressDtos(addressDtos);
+      returnUser.setAddressDtos(addressDtos);
         return returnUser;
     }
 
@@ -104,11 +110,14 @@ public class UserService implements UserDetailsService {
                 true,true,true, new ArrayList<>());
     }
 
-    public UserDto getUser(String email) {
+    public UserDto getUser(String email) throws Exception {
         UserEntity userEntity = userRepository.findByEmail(email);
 
         if (userEntity == null)
             throw new UsernameNotFoundException(email);
+
+        if(!userEntity.getEmailVerificationStatus())
+            throw new Exception("Account Not Verified");
 
         UserDto returnValue = new UserDto();
         BeanUtils.copyProperties(userEntity, returnValue);
@@ -168,20 +177,26 @@ public class UserService implements UserDetailsService {
         return returnValue;
     }
 
-    public boolean requestPasswordReset(String email) {
+    public boolean requestPasswordReset(UserDto userDto, String url) throws MessagingException, UnsupportedEncodingException {
 
         boolean returnValue = false;
 
-        UserEntity userEntity=userRepository.findByEmail(email);
-        if(userEntity == null){
-            return returnValue;
-        }
+       UserEntity userEntity= new UserEntity();
+//        if(userEntity == null){
+//            return returnValue;
+//        }
+        BeanUtils.copyProperties(userDto,userEntity);
 
-//        String token = Utils.generatePasswordResetToken(userEntity.getUserId());
-//        PasswordResetTokenEntity passwordResetTokenEntity = new PasswordResetTokenentity();
-//        passwordResetTokenEntity.setToken(token);
-//        passwordResetTokenEntity.setUserDetails(userEntity);
-//        passwordResetTokenRepository.save(passwordResetTokenEntity);
+
+        String token = new Utils().generatePasswordResetToken(userEntity.getUserId());
+
+        PasswordResetTokenEntity passwordResetTokenEntity = new PasswordResetTokenEntity();
+        passwordResetTokenEntity.setToken(token);
+        passwordResetTokenEntity.setUserDetails(userEntity);
+        passwordResetTokenRepository.save(passwordResetTokenEntity);
+
+        triggerMailForPasswordReset(passwordResetTokenEntity,userEntity,url);
+        returnValue=true;
 
         return  returnValue;
     }
@@ -204,12 +219,46 @@ public class UserService implements UserDetailsService {
         return returnValue;
     }
 
-    public void triggerMail(UserEntity userEntity,String url) throws MessagingException, UnsupportedEncodingException {
-        emailService.sendSimpleEmail(userEntity,url);
+    public void triggerMailForAccountActivation(UserEntity userEntity,String url)
+            throws MessagingException, UnsupportedEncodingException {
+
+        emailService.sendSimpleEmailForAccountActivation(userEntity,url);
 
     }
 
+    public void triggerMailForPasswordReset(
+            PasswordResetTokenEntity passwordResetTokenEntity,
+            UserEntity userEntity,
+            String url)
+            throws MessagingException, UnsupportedEncodingException {
 
+        emailService.sendSimpleEmailForPasswordReset(passwordResetTokenEntity,userEntity,url);
 
+    }
 
+    public boolean verifyPasswordResetToken(
+            String userId, String token, PasswordResetRequestModel passwordResetRequestModel) {
+
+        boolean returnValue = false;
+
+        UserEntity userEntity=userRepository.findByUserId(userId);
+
+        String encryptedNewPassword=bCryptPasswordEncoder.encode(passwordResetRequestModel.getNewPassword());
+
+        if(bCryptPasswordEncoder.matches(
+                passwordResetRequestModel.getCurrentPassword(),
+                userEntity.getEncryptedPassword())) {
+            System.out.println("Matched");
+            boolean hastokenExpired = Utils.hasTokenExpired(token);
+
+            if (!hastokenExpired) {
+                System.out.println("Not Expired");
+                userEntity.setEncryptedPassword(encryptedNewPassword);
+                userRepository.save(userEntity);
+                returnValue = true;
+            }
+
+        }
+        return returnValue;
+    }
 }
